@@ -331,7 +331,7 @@ def main():
     print(f"🔌 로컬 포트 연결됨: {local_port}")
 
     engine = create_engine(
-        f"mysql+pymysql://{settings.db_host}:{settings.db_password}"
+        f"mysql+pymysql://{settings.db_user}:{settings.db_password}"
         f"@127.0.0.1:{local_port}/{settings.db_name}"
     )
 
