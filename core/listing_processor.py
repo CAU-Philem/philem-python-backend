@@ -21,7 +21,14 @@ def process_listing(conn, row, result):
     row_index = listing_id
 
     # 이거 반환할거임
-    model_ids = []
+    out = {
+        "listing_id": listing_id,
+        "post_url": full_url,       # for debugging perhaps
+        "is_bundle": False,
+        "bundle_index": None,
+        "bundle_total_price": None,
+        "items": []
+    }
 
     try:
         # 1) OpenAI 실패 / 파싱 실패 처리
@@ -29,14 +36,14 @@ def process_listing(conn, row, result):
             print(f"[{row_index}] ❌ OpenAI 응답/파싱 실패 → done 표시")
             mark_listing_done(conn, listing_id)
             conn.commit()
-            return model_ids
+            return out
 
         items = result.get("items", [])
         if not isinstance(items, list):
             print(f"[{row_index}] ❌ items 형식 오류 → done 표시")
             mark_listing_done(conn, listing_id)
             conn.commit()
-            return model_ids
+            return out
 
         # 2) 브랜드/역할 필터링
         filtered_items = []
@@ -54,7 +61,7 @@ def process_listing(conn, row, result):
             print(f"[{row_index}] 🚫 제외 (브랜드/역할 조건 미충족)")
             mark_listing_done(conn, listing_id)
             conn.commit()
-            return model_ids
+            return out
 
         target_items = filtered_items
         is_bundle = len(target_items) > 1 or (
@@ -65,6 +72,10 @@ def process_listing(conn, row, result):
 
         # 🔍 listing 원래 가격 필요
         listing_price = row["price"]
+
+        out["is_bundle"] = is_bundle
+        out["bundle_index"] = current_bundle_index if is_bundle else None
+        out["bundle_total_price"] = listing_price if is_bundle else None
 
         # 🔥 여기서부터가 핵심: 기존 데이터 삭제 후 새로 쓰기
         conn.execute(
@@ -79,7 +90,7 @@ def process_listing(conn, row, result):
         # 3) 새 결과 INSERT
         for item in target_items:
             model_id = get_or_create_model_full_spec(conn, item)
-            model_ids.append(model_id)
+            # model_ids.append(model_id)
             role = item.get("role")
             ai_price = item.get("price", 0) or 0
 
@@ -122,6 +133,16 @@ def process_listing(conn, row, result):
                 },
             )
 
+            out["items"].append({
+                "model_id": model_id,
+                "condition": cond_val,
+                "price": final_price,          # can be None
+                "price_type": price_type,      # tells FE why None happened
+                "role": role,
+                "bundle_index": current_bundle_index if is_bundle else None,
+            })
+
+
         if is_bundle:
             conn.execute(
                 text(
@@ -143,9 +164,9 @@ def process_listing(conn, row, result):
         mark_listing_done(conn, listing_id)
         conn.commit()
 
-        return model_ids
+        return out
 
     except Exception as e:
         conn.rollback()
         print(f"[{row_index}] ❌ DB 처리 중 예외 발생 → 롤백: {e}")
-        return []
+        return {**out, "items": []}
