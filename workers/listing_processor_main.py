@@ -259,7 +259,8 @@ def analyze_camera_data_openai(
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                # model="gpt-4o-mini",
+                model="gpt-5.1",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": full_text},
@@ -297,6 +298,7 @@ def analyze_camera_data_openai(
     print("⚠️ OpenAI 재시도 한도 도달 → None 반환")
     return None
 
+
 # =========================================================
 # 7. 메인 실행부
 # =========================================================
@@ -329,7 +331,8 @@ def main():
     print(f"🔌 로컬 포트 연결됨: {local_port}")
 
     engine = create_engine(
-        f"mysql+pymysql://{settings.db_host}:{settings.db_password}" f"@127.0.0.1:{local_port}/{settings.db_name}"
+        f"mysql+pymysql://{settings.db_host}:{settings.db_password}"
+        f"@127.0.0.1:{local_port}/{settings.db_name}"
     )
 
     with engine.connect() as conn:
@@ -377,7 +380,6 @@ def main():
                 result = data["res"]
 
                 process_listing(conn, row, result)
-
 
         print("💾 전체 배치 처리 완료!")
 
