@@ -3,13 +3,18 @@
 import mysql.connector
 from dateutil import parser
 import re
-from config.settings import settings
 
 # --- [설정] DB 접속 정보 (기존 insert_articles.py 참조) ---
-
+DB_CONFIG = {
+    'host': 'philem-db.c5ic8y4moapt.ap-northeast-2.rds.amazonaws.com',
+    'user': 'admin',
+    'password': 'jaemin34!!',  # 보안을 위해 환경변수 사용을 권장합니다.
+    'database': 'philem_db',
+    'port': 3306
+}
 
 def get_db_connection():
-    return mysql.connector.connect(**settings)
+    return mysql.connector.connect(**DB_CONFIG)
 
 def clean_price(price_input):
     """가격 정보를 정수로 변환"""
@@ -67,18 +72,18 @@ def insert_single_article(article_data):
         p_region_id = article_data.get('region_id')
 
         # [수정됨] ON DUPLICATE KEY UPDATE 부분에 조건문 추가
-        # 가격, 썸네일, 본문이 하나라도 다르면 need_processing = 1, 아니면 기존 값 유지
+        # 가격, 썸네일, 본문이 하나라도 다르면 needs_processing = 1, 아니면 기존 값 유지
         sql = """
         INSERT INTO listing 
         (id, title, price, thumbnail_url, post_url, status, description, created_at, boosted_at, region_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            need_processing = IF(
+            needs_processing = IF(
                 price != VALUES(price) OR 
                 thumbnail_url != VALUES(thumbnail_url) OR 
                 description != VALUES(description),
                 1, 
-                need_processing
+                needs_processing
             ),
             title = VALUES(title),
             price = VALUES(price),
