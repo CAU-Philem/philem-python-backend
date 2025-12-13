@@ -20,5 +20,4 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"  # load environment variables if present
 
-
 settings = Settings()
