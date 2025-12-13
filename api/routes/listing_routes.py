@@ -19,7 +19,7 @@ def analyze_url(payload: UrlInput, db: Session = Depends(get_db)):
     canonical_url = normalize_daangn_url(payload.url)
 
     try:
-        listing_id = process_single_url(canonical_url)
+        listing_id = process_single_url(db, canonical_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Crawl failed: {str(e)}")
 
