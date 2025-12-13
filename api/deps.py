@@ -4,9 +4,7 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from config.settings import get_settings
-
-settings = get_settings()
+from config.settings import settings
 
 # Build a SQLAlchemy engine for direct DB access (NOT via SSH tunnel).
 # If your FastAPI server runs in an environment where it needs SSH tunneling

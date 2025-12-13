@@ -9,7 +9,7 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
 # 분리한 DB 모듈 임포트
-import insert_single
+from ingestion import insert_single
 from core.locations import SEOUL_LOCATIONS_DATA
 
 # --- [설정] 지역 ID 매핑 데이터 (insert_articles.py에서 가져옴) ---

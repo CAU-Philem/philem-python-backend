@@ -8,14 +8,18 @@ class Settings(BaseSettings):
 
     # SSH
     ssh_host: str
-    ssh_user: str
+    ssh_user: str   
     ssh_key_path: str
 
     # DB
     db_host: str
+    db_port: int
     db_user: str
     db_password: str
     db_name: str
+
+    kakao_rest_key: str
+    database_url: str
 
     class Config:
         env_file = ".env"  # load environment variables if present
