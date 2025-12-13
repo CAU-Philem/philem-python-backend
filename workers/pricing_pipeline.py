@@ -157,7 +157,7 @@ def sync_model_price_snapshots(months_back: int = 36):
     cutoff_date = date.today() - timedelta(days=months_back * 30)
 
     sql = text("""
-        INSERT INTO ModelPriceSnapshotMonth (
+        INSERT INTO model_price_snapshot_month (
             model_id,
             sold_year,
             sold_month,
@@ -249,7 +249,7 @@ def main():
                 cutoff_date = date.today() - timedelta(days=36 * 30)
 
                 r2 = conn.execute(text("""
-                    INSERT INTO ModelPriceSnapshotMonth (
+                    INSERT INTO model_price_snapshot_month (
                         model_id,
                         sold_year,
                         sold_month,

@@ -10,6 +10,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from dateutil import parser as date_parser
+from sqlalchemy.orm import Session
+
 
 # 분리한 DB 모듈 임포트
 from ingestion import insert_single
@@ -167,7 +169,7 @@ def scrape_data_from_dom(driver, target_url):
         print(f"❌ DOM 파싱 에러: {e}")
         return None
 
-def process_single_url(target_url):
+def process_single_url(db: Session, target_url: str) -> str:
     db_id = extract_url_info(target_url)
     if not db_id:
         print("❌ 유효한 URL이 아닙니다.")
@@ -202,15 +204,25 @@ def process_single_url(target_url):
             'region_id': region_id 
         }
 
-        if insert_single.insert_single_article(mapped_data):
-            print(f"✅ 저장 완료!")
-            print(f"   - 상태: {mapped_data['status']}")
-            print(f"   - 지역: {scraped_data['region_name']} -> {region_id}")
-        else:
-            print("❌ 저장 실패")
+        # ✅ db 세션 넘겨서 같은 트랜잭션으로 insert
+        ok = insert_single.insert_single_article(db, mapped_data)
+        if not ok:
+            raise RuntimeError("❌ 저장 실패")
+
+        # ✅ commit은 여기서 (insert_single 내부에서 commit 제거했을 때)
+        db.commit()
+
+        print("✅ 저장 완료!")
+        print(f"   - 상태: {mapped_data['status']}")
+        print(f"   - 지역: {scraped_data['region_name']} -> {region_id}")
+
+        return db_id
 
     except Exception as e:
+        # ✅ 실패 시 rollback (같은 세션이니까)
+        db.rollback()
         print(f"❌ 에러: {e}")
+        raise
     finally:
         driver.quit()
 

@@ -3,6 +3,8 @@
 import mysql.connector
 from dateutil import parser
 import re
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 # --- [설정] DB 접속 정보 (기존 insert_articles.py 참조) ---
 DB_CONFIG = {
@@ -49,34 +51,29 @@ def parse_time(time_input):
     except:
         return None
 
-def insert_single_article(article_data):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+def insert_single_article(db: Session, article_data: str) -> bool:
+    p_id = article_data.get('id')
+    p_title = article_data.get('title')
+    
+    if not p_id or not p_title:
+        print("❌ [DB Error] 필수 데이터(ID, Title)가 누락되었습니다.")
+        return False
 
-        p_id = article_data.get('id')
-        p_title = article_data.get('title')
-        
-        if not p_id or not p_title:
-            print("❌ [DB Error] 필수 데이터(ID, Title)가 누락되었습니다.")
-            return False
+    p_price = clean_price(article_data.get('price'))
+    p_thumb = article_data.get('thumbnail_url')
+    p_link = article_data.get('post_url')
+    p_status = parse_status(article_data.get('status'))
+    p_desc = article_data.get('description', '')
+    p_created = parse_time(article_data.get('created_at'))
+    p_boosted = parse_time(article_data.get('boosted_at'))
+    p_region_id = article_data.get('region_id')
 
-        p_price = clean_price(article_data.get('price'))
-        p_thumb = article_data.get('thumbnail_url')
-        p_link = article_data.get('post_url')
-        p_status = parse_status(article_data.get('status'))
-        p_desc = article_data.get('description', '')
-        p_created = parse_time(article_data.get('created_at'))
-        p_boosted = parse_time(article_data.get('boosted_at'))
-        p_region_id = article_data.get('region_id')
-
-        # [수정됨] ON DUPLICATE KEY UPDATE 부분에 조건문 추가
-        # 가격, 썸네일, 본문이 하나라도 다르면 needs_processing = 1, 아니면 기존 값 유지
-        sql = """
+    # [수정됨] ON DUPLICATE KEY UPDATE 부분에 조건문 추가
+    # 가격, 썸네일, 본문이 하나라도 다르면 needs_processing = 1, 아니면 기존 값 유지
+    sql = text("""
         INSERT INTO listing 
         (id, title, price, thumbnail_url, post_url, status, description, created_at, boosted_at, region_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (:id, :title, :price, :thumbnail_url, :post_url, :status, :description, :created_at, :boosted_at, :region_id)
         ON DUPLICATE KEY UPDATE
             needs_processing = IF(
                 price != VALUES(price) OR 
@@ -94,19 +91,29 @@ def insert_single_article(article_data):
             created_at = VALUES(created_at),
             boosted_at = VALUES(boosted_at),
             region_id = VALUES(region_id)
-        """
-
-        cursor.execute(sql, (
-            p_id, p_title, p_price, p_thumb, p_link, p_status, 
-            p_desc, p_created, p_boosted, p_region_id
-        ))
-        conn.commit()
-        print(f"✅ [DB Success] 게시글 저장 완료 (ID: {p_id})")
+        """)
+    try:
+        db.execute(sql, {
+            "id": p_id,
+            "title": p_title,
+            "price": p_price,
+            "thumbnail_url": p_thumb,
+            "post_url": p_link,
+            "status": p_status,
+            "description": p_desc,
+            "created_at": p_created,
+            "boosted_at": p_boosted,
+            "region_id": p_region_id,
+        })
+        print(f"✅ [DB Success] 게시글 저장 준비 완료 (ID: {p_id})")  # commit은 caller에서
         return True
-
     except Exception as e:
         print(f"❌ [DB Fail] 저장 실패: {e}")
-        if conn: conn.rollback()
+        # rollback은 caller가 하거나 여기서 해도 됨. 보수적으로 여기서 해줌.
+        db.rollback()
         return False
-    finally:
-        if conn: conn.close()
+    """
+    conn.commit()
+    print(f"✅ [DB Success] 게시글 저장 완료 (ID: {p_id})")
+    return True
+    """
