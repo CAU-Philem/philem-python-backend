@@ -5,14 +5,16 @@ from dateutil import parser
 import re
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from config.settings import settings
 
 # --- [설정] DB 접속 정보 (기존 insert_articles.py 참조) ---
+
 DB_CONFIG = {
-    'host': 'philem-db.c5ic8y4moapt.ap-northeast-2.rds.amazonaws.com',
-    'user': 'admin',
-    'password': 'jaemin34!!',  # 보안을 위해 환경변수 사용을 권장합니다.
-    'database': 'philem_db',
-    'port': 3306
+    'host': settings.db_host,
+    'user': settings.db_user,
+    'password': settings.db_password,  # 보안을 위해 환경변수 사용을 권장합니다.
+    'database': settings.db_name,
+    'port': settings.db_port
 }
 
 def get_db_connection():
@@ -51,7 +53,7 @@ def parse_time(time_input):
     except:
         return None
 
-def insert_single_article(db: Session, article_data: str) -> bool:
+def insert_single_article(db: Session, article_data: dict) -> bool:
     p_id = article_data.get('id')
     p_title = article_data.get('title')
     
@@ -59,10 +61,22 @@ def insert_single_article(db: Session, article_data: str) -> bool:
         print("❌ [DB Error] 필수 데이터(ID, Title)가 누락되었습니다.")
         return False
 
+    incoming_status = parse_status(article_data.get("status"))
+
+    row = db.execute(
+        text("SELECT status FROM listing WHERE id = :id"),
+        {"id": p_id},
+    ).mappings().fetchone()
+
+    if row and row["status"] == "SoldOut":
+        print("✅ 이미 SoldOut → 이후 변경(가격/본문/상태 포함) 무시하고 스킵")
+        db.execute(text("UPDATE listing SET needs_processing = 0 WHERE id = :id"), {"id": p_id})
+        return True
+
     p_price = clean_price(article_data.get('price'))
     p_thumb = article_data.get('thumbnail_url')
     p_link = article_data.get('post_url')
-    p_status = parse_status(article_data.get('status'))
+    p_status = incoming_status
     p_desc = article_data.get('description', '')
     p_created = parse_time(article_data.get('created_at'))
     p_boosted = parse_time(article_data.get('boosted_at'))
@@ -76,9 +90,9 @@ def insert_single_article(db: Session, article_data: str) -> bool:
         VALUES (:id, :title, :price, :thumbnail_url, :post_url, :status, :description, :created_at, :boosted_at, :region_id)
         ON DUPLICATE KEY UPDATE
             needs_processing = IF(
-                price != VALUES(price) OR 
-                thumbnail_url != VALUES(thumbnail_url) OR 
-                description != VALUES(description),
+                NOT (price <=> VALUES(price)) OR
+                NOT (thumbnail_url <=> VALUES(thumbnail_url)) OR
+                NOT (description <=> VALUES(description)),
                 1, 
                 needs_processing
             ),
@@ -109,7 +123,7 @@ def insert_single_article(db: Session, article_data: str) -> bool:
         return True
     except Exception as e:
         print(f"❌ [DB Fail] 저장 실패: {e}")
-        # rollback은 caller가 하거나 여기서 해도 됨. 보수적으로 여기서 해줌.
+        #rollback은 caller가 하거나 여기서 해도 됨. 보수적으로 여기서 해줌.
         db.rollback()
         return False
     """

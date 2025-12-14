@@ -12,6 +12,7 @@ from .listing_processor_utils import (
 def process_listing(conn, row, result):
     listing_id = int(row["seq"])
 
+
     post_url = row["post_url"]
     if post_url and isinstance(post_url, str) and post_url.startswith("/"):
         full_url = "https://www.daangn.com" + post_url
@@ -19,6 +20,9 @@ def process_listing(conn, row, result):
         full_url = post_url
 
     row_index = listing_id
+
+    print(f"[{row_index}] DEBUG keys={list(row.keys())}")
+    print(f"[{row_index}] DEBUG status={row.get('status')}")
 
     # 이거 반환할거임
     out = {
@@ -76,6 +80,61 @@ def process_listing(conn, row, result):
         out["is_bundle"] = is_bundle
         out["bundle_index"] = current_bundle_index if is_bundle else None
         out["bundle_total_price"] = listing_price if is_bundle else None
+
+
+        db_status = conn.execute(
+            text("SELECT status FROM listing WHERE seq = :lid"),
+            {"lid": listing_id},
+        ).scalar()
+        # ✅ [추가] 판매완료(SoldOut) listing은 절대 수정/삭제/재생성 하지 않음 (freeze)
+        if db_status == "SoldOut":
+            print(f"[{row_index}] 🧊 SoldOut(DB) → DB 수정/삭제 스킵 + 기존 ListingItem 반환")
+
+            # 1) 기존 ListingItem 읽기
+            rows = conn.execute(
+                text("""
+                    SELECT model_id, `condition`, price, price_type, unit_type, bundle_index
+                    FROM ListingItem
+                    WHERE listing_id = :lid
+                    ORDER BY id ASC
+                """),
+                {"lid": listing_id},
+            ).mappings().fetchall()
+
+            out["items"] = [
+                {
+                    "model_id": r["model_id"],
+                    "condition": r["condition"],
+                    "price": r["price"],
+                    "price_type": r["price_type"],
+                    "role": r["unit_type"],
+                    "bundle_index": r["bundle_index"],
+                }
+                for r in rows
+            ]
+
+            # 2) 번들 정보도 있으면 채우기
+            b = conn.execute(
+                text("""
+                    SELECT bundle_index, total_price
+                    FROM Bundles
+                    WHERE listing_id = :lid
+                    LIMIT 1
+                """),
+                {"lid": listing_id},
+            ).mappings().fetchone()
+
+            if b:
+                out["is_bundle"] = True
+                out["bundle_index"] = b["bundle_index"]
+                out["bundle_total_price"] = b["total_price"]
+            else:
+                out["is_bundle"] = len(out["items"]) > 1
+
+            # 3) 처리 플래그만 0으로 (DB 내용은 안 바꿈)
+            mark_listing_done(conn, listing_id)
+            conn.commit()
+            return out
 
         # 🔥 여기서부터가 핵심: 기존 데이터 삭제 후 새로 쓰기
         conn.execute(
