@@ -10,6 +10,8 @@ from ingestion.url_normalizer import normalize_daangn_url
 from core.openai_analyzer import OpenAIAnalyzer
 from core.listing_processor import process_listing
 from config.settings import settings
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,7 +24,7 @@ ANALYZER = OpenAIAnalyzer(
 )
 
 @router.post("/listings/from-url")
-def analyze_url(payload: UrlInput, db: Session = Depends(get_db)):
+async def analyze_url(payload: UrlInput, db: Session = Depends(get_db)):
     canonical_url = normalize_daangn_url(payload.url)
     
     try:
@@ -87,4 +89,5 @@ def analyze_url(payload: UrlInput, db: Session = Depends(get_db)):
 
     except Exception as e:
         db.rollback()
+        logger.exception("ERROR in /listings/from-url payload=%s canonical_url=%s", payload.url, canonical_url)
         raise HTTPException(status_code=500, detail=f"Failed: {str(e)}")
