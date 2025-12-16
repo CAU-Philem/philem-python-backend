@@ -5,8 +5,12 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # OPENAI
     openai_api_keys: list[str]
+    openai_model: str
+    openai_workers: int
+    worker_sleep_seconds: int
 
     # SSH
+    use_ssh_tunnel: bool
     ssh_host: str
     ssh_user: str   
     ssh_key_path: str
