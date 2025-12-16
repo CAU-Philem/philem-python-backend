@@ -13,7 +13,6 @@ services:
     restart: always
 
   worker:
-    build: .
     command: >
       python -m workers.listing_processor_main
     env_file:
