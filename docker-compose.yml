@@ -1,11 +1,12 @@
 services:
   api:
+    image: philem-python:latest
     build: .
     command: >
       uvicorn api.main:app
       --host 0.0.0.0
       --port 8000
-      --workers 2
+      --workers 1
     ports:
       - "8000:8000"
     env_file:
@@ -13,6 +14,7 @@ services:
     restart: always
 
   worker:
+    image: philem-python:latest
     command: >
       python -m workers.listing_processor_main
     env_file:
