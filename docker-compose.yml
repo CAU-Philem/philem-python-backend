@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   api:
     build: .
@@ -17,7 +15,7 @@ services:
   worker:
     build: .
     command: >
-      python workers/listing_processor_main.py
+      python -m workers.listing_processor_main
     env_file:
       - .env
     restart: always

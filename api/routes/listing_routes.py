@@ -48,6 +48,9 @@ def analyze_url(payload: UrlInput, db: Session = Depends(get_db)):
         else:
             ai = ANALYZER.analyze_camera_data_openai(row["title"], row["description"], row["price"])
 
+        print("DEBUG ai is None?", ai is None)
+        print("DEBUG ai raw:", ai)
+
         out = process_listing(db, row, ai)
 
         items = out.get("items", [])
